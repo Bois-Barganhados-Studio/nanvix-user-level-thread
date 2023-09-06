@@ -19,14 +19,19 @@
 
 # Conflicts.
 .PHONY: libc
+.PHONY: bthread
 
 # Builds everything.
-all: libc
+all: libc bthread
 
 # Builds C library.
 libc:
 	cd libc/ && $(MAKE) all
 
+bthread:
+	cd bthread/ && $(MAKE) all
+
 # Cleans compilation files.
 clean:
 	cd libc && $(MAKE) clean
+	cd bthread && $(MAKE) clean

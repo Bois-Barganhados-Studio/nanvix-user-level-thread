@@ -19,47 +19,20 @@
 
 # C source files.
 C_SRC = $(wildcard *.c)           \
-      $(wildcard assert/*.c)      \
-      $(wildcard ctype/*.c)       \
-      $(wildcard dirent/*.c)      \
-      $(wildcard errno/*.c)       \
-      $(wildcard fcntl/*.c)       \
-      $(wildcard signal/*.c)      \
-      $(wildcard stdio/*.c)       \
-      $(wildcard stdlib/*.c)      \
-      $(wildcard string/*.c)      \
-      $(wildcard stropts/*.c)     \
-      $(wildcard sys/times/*.c)   \
-      $(wildcard sys/sem/*.c)     \
-      $(wildcard sys/stat/*.c)    \
-      $(wildcard sys/utsname/*.c) \
-      $(wildcard sys/wait/*.c)    \
-      $(wildcard termios/*.c)     \
-      $(wildcard unistd/*.c)      \
-      $(wildcard utime/*.c)       \
-
-# Assembly source files.
-ASM_SRC =   $(wildcard setjmp/*.S) \
-            $(wildcard signal/*.S) \
 
 # Object files.
-OBJ = $(ASM_SRC:.S=.o) \
-	  $(C_SRC:.c=.o)   \
+OBJ = $(C_SRC:.c=.o)   \
 
 # Library name.
-LIB = libc.a
+LIB = bthread.a
 
-# Builds the C library.
+# Builds the library.
 all: $(OBJ)
 	$(AR) $(ARFLAGS) $(LIBDIR)/$(LIB) $^
 
 # Builds object file from C source file.
 %.o: %.c
 	$(CC) $< $(CFLAGS) -c -o $@
-
-# Builds object file from assembly source file.
-%.o: %.S
-	$(CC) $< $(CFLAGS) -c $(ASMFLAGS) -o $@
 
 # Cleans compilation files.
 clean:
