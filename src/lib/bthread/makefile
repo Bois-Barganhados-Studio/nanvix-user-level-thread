@@ -20,19 +20,28 @@
 # C source files.
 C_SRC = $(wildcard *.c)           \
 
+
+# Assembly source files.
+ASM_SRC =   $(wildcard *.S) \
+
 # Object files.
-OBJ = $(C_SRC:.c=.o)   \
+OBJ = $(ASM_SRC:.S=.o) \
+	  $(C_SRC:.c=.o)   \
 
 # Library name.
 LIB = bthread.a
 
-# Builds the library.
+# Builds the C library.
 all: $(OBJ)
-	$(AR) $(ARFLAGS) $(LIBDIR)/$(LIB) $^
+	$(AR) $(ARFLAGS) $(LIBDIR)/$(LIB) $^ $(LIBDIR)/libc.a
 
 # Builds object file from C source file.
 %.o: %.c
 	$(CC) $< $(CFLAGS) -c -o $@
+
+# Builds object file from assembly source file.
+%.o: %.S
+	$(CC) $< $(CFLAGS) -c $(ASMFLAGS) -o $@
 
 # Cleans compilation files.
 clean:

@@ -17,12 +17,6 @@
  * along with Nanvix. If not, see <http://www.gnu.org/licenses/>.
  */
 
-/* Must come first */
-; #define _ASM_FILE_
-
-; #include <i386/i386.h> ; pre-processor not working :(
-
-
 .globl setjmp
 
 .type setjmp,@function
@@ -35,10 +29,9 @@ setjmp:
     pushf
     popl 12(%eax)
     movl %ebp, 16(%eax)
-    movl (%esp), %ecx
+    lea 4(%esp), %ecx       // get caller esp
+    movl (%esp), %edx       // get caller eip
     movl %ecx, 20(%eax)
-    lea 4(%esp), %ecx
-    movl %ecx, 24(%eax)
-    xor %eax, %eax
+    movl %edx, 24(%eax)
+    xorl %eax, %eax
     ret
-

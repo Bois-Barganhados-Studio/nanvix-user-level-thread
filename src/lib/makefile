@@ -28,7 +28,7 @@ all: libc bthread
 libc:
 	cd libc/ && $(MAKE) all
 
-bthread:
+bthread: libc
 	cd bthread/ && $(MAKE) all
 
 # Cleans compilation files.

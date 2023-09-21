@@ -17,23 +17,18 @@
  * along with Nanvix. If not, see <http://www.gnu.org/licenses/>.
  */
 
-/* Must come first */
-; #define _ASM_FILE_
-
-; #include <i386/i386.h> ; pre-processor not working :(
-
 .globl longjmp
 
 .type longjmp,@function
 
 longjmp:
-    mov 4(%esp), %ecx
-    mov 8(%esp), %eax 
+    movl 4(%esp), %ecx
+    movl 8(%esp), %eax 
     test %eax, %eax
     jnz valnz
     inc %eax
 valnz:
-    movl (%ecx), %ebx
+    movl 0(%ecx), %ebx
     movl 4(%ecx), %esi
     movl 8(%ecx), %edi
     pushl 12(%ecx)
