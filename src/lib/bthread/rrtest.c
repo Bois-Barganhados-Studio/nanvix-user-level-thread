@@ -1,3 +1,4 @@
+#define IMPL_TESTS
 #include <bthread.h>
 #include <stdio.h>
 #include <setjmp.h>
@@ -8,7 +9,7 @@
 #define T1_DURATION 0x40000000
 #define T2_DURATION 0x40000000
 
-#define SET_ALARM_HANDLER(ret) \
+#define SET_ALARM_HANDLER() \
     __asm__ volatile ( \
 		"int $0x80" \
 		: "=a" (ret) \
@@ -16,7 +17,7 @@
 		  "b" (SIGALRM), \
 		  "c" (handler), \
 		  "d" (bthd_restorer) \
-	);
+	)
 
 static jmp_buf buf;
 static unsigned long ctx[NUM_THDS][9];
@@ -35,7 +36,7 @@ static void handler();
 
 extern void round_robin_test()
 {
-    SET_ALARM_HANDLER(ret);
+    SET_ALARM_HANDLER();
     scheduler();
 }
 
@@ -106,5 +107,5 @@ static void bthd_restorer()
 static void handler()
 {
     printf("i: %d\tj: %d\n", i, j);
-    SET_ALARM_HANDLER(ret);
+    SET_ALARM_HANDLER();
 }

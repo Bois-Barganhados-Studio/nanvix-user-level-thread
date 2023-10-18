@@ -3,16 +3,17 @@
 
 #define BTHREAD_THREADS_MAX 16      /* Maximum number of threads per process. */
 #define BTHREAD_STACK_SIZE 1024     /* Thread stack size in bytes. */
+#define BTHREAD_CTXBUF_SIZE 9       /* Number of registers saved in the context buffer. */
 
 #ifndef _ASM_FILE_
 
-typedef struct bthread bthread_t;
+typedef unsigned bthread_t;
 
-extern int bthread_create(bthread_t *thread, void *(*start_routine)(void*), void *arg);
+extern int bthread_create(bthread_t *thread, void *(*start_routine)(), void *arg);
 extern void bthread_exit(void *retval);
-extern int bthread_join(bthread_t *thread, void **thread_return);
-extern int bthread_cancel(bthread_t *thread);
-extern int bthread_detach(bthread_t *thread);
+extern int bthread_join(bthread_t thread, void **thread_return);
+extern int bthread_cancel(bthread_t thread);
+extern int bthread_detach(bthread_t thread);
 // Maybe do mutex stuff too.
 
 
