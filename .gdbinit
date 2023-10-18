@@ -12,7 +12,7 @@ set confirm off
 focus cmd
 set detach-on-fork
 #set breakpoint pending on
-b round_robin_test
+b main
 
 define hook-stop
 	if $_isvoid ($_exitcode) != 1

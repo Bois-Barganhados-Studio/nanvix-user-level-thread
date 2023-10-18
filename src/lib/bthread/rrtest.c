@@ -9,7 +9,6 @@
 #define T2_DURATION 0x40000000
 
 #define SET_ALARM_HANDLER(ret) \
-do { \
     __asm__ volatile ( \
 		"int $0x80" \
 		: "=a" (ret) \
@@ -17,8 +16,7 @@ do { \
 		  "b" (SIGALRM), \
 		  "c" (handler), \
 		  "d" (bthd_restorer) \
-	); \
-} while (0)
+	);
 
 static jmp_buf buf;
 static unsigned long ctx[NUM_THDS][9];
@@ -46,7 +44,6 @@ static void thread1()
     for (i = 0; i < T1_DURATION; i++)
         /* eat time */;
     finished[0] = 1;
-    puts("t1 finished");
 }
 
 static void thread2()
@@ -54,7 +51,6 @@ static void thread2()
     for (j = 0; j < T2_DURATION; j++)
         /* eat time */;
     finished[1] = 1;
-    puts("t2 finished");
 }
 
 static void scheduler()
@@ -62,7 +58,10 @@ static void scheduler()
     if (!setjmp(buf)) {
         alarm(1);
         thread1();
+        if (count <= 1)
+            goto t2;
     } else if (count == 1) {
+t2:
         alarm(1);
         thread2();
     }
