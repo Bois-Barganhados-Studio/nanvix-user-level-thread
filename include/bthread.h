@@ -4,7 +4,7 @@
 #define BTHREAD_THREADS_MAX 16      /* Maximum number of threads per process. */
 #define BTHREAD_STACK_SIZE 1024     /* Thread stack size in bytes. */
 #define BTHREAD_CTXBUF_SIZE 9       /* Number of registers saved in the context buffer. */
-
+#define BTHREAD_TQUANTUM 10
 #ifndef _ASM_FILE_
 
 typedef unsigned bthread_t;

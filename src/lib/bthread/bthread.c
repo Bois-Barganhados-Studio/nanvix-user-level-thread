@@ -7,7 +7,6 @@
 #define bool char
 #define true 1
 #define false 0
-
 #define MAIN_THREAD 0
 
 typedef unsigned long context_t[BTHREAD_CTXBUF_SIZE];
@@ -38,9 +37,19 @@ static unsigned thd_count = 0;
 
 static inline void set_sigalrm_handler();
 
-static int bthread_alarm(void)
+static unsigned bthread_alarm()
 {
-    return -1;
+    unsigned ret;
+
+	__asm__ volatile (
+		"int $0x80"
+		: "=a" (ret)
+		: "0" (NR_btalarm),
+          "b" (BTHREAD_TQUANTUM)
+	);
+
+    /* Time left on old alarm */
+    return ret;
 }
 
 static void restorer(void)

@@ -31,7 +31,7 @@
 	#include <utime.h>
 
 	/* Number of system calls. */
-	#define NR_SYSCALLS 51
+	#define NR_SYSCALLS 52
 
 	/* System call numbers. */
 	#define NR_alarm     0
@@ -85,6 +85,7 @@
  	#define NR_semget   48
  	#define NR_semctl   49
  	#define NR_semop    50
+	#define NR_btalarm  51
 
 #ifndef _ASM_FILE_
 
@@ -106,6 +107,7 @@
 	EXTERN pid_t sys_setpgrp(void);
 	EXTERN int sys_setuid(pid_t uid);
 	EXTERN pid_t sys_wait(int *stat_loc);
+	EXTERN unsigned sys_btalarm(unsigned seconds);
 
 	/*
 	 * Duplicates a file descriptor.

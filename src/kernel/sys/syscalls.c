@@ -75,5 +75,6 @@ PUBLIC void (*syscalls_table[NR_SYSCALLS])(void)  = {
 	(void (*)(void))&sys_gticks,
     NULL,
     NULL,
-    NULL
+    NULL,
+	(void (*)(void))&sys_btalarm
 };
