@@ -12,7 +12,7 @@ set confirm off
 focus cmd
 set detach-on-fork
 #set breakpoint pending on
-b main
+b btrestorer
 
 define hook-stop
 	if $_isvoid ($_exitcode) != 1

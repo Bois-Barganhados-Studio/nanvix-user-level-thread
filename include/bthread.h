@@ -5,6 +5,7 @@
 #define BTHREAD_STACK_SIZE 1024     /* Thread stack size in bytes. */
 #define BTHREAD_CTXBUF_SIZE 9       /* Number of registers saved in the context buffer. */
 #define BTHREAD_TQUANTUM 10
+
 #ifndef _ASM_FILE_
 
 typedef unsigned bthread_t;
@@ -22,7 +23,6 @@ extern int bthread_detach(bthread_t thread);
     void set_static_var(unsigned long val);
     unsigned long get_static_var();
     extern void round_robin_test();
-    extern void loadctx(unsigned long *ctx);
     extern void stk_test();
 #endif /* IMPL_TESTS */
 

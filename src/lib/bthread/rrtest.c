@@ -33,6 +33,7 @@ static void thread2();
 static void scheduler();
 static void bthd_restorer();
 static void handler();
+extern void loadctx(unsigned long *ctx);
 
 extern void round_robin_test()
 {
