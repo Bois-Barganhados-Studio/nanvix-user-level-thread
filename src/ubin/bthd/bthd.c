@@ -5,11 +5,13 @@
 #include <unistd.h>
 #include <stdlib.h>
 
-#define T1_DURATION 0x40000000
+#define T1_DURATION 0x4
 #define T2_DURATION 0x40000000
+#define T3_DURATION 0x40000000
 
 static unsigned long i = 0;
 static unsigned long j = 0;
+static unsigned long k = 0;
 
 void *thd1()
 {
@@ -25,15 +27,24 @@ void *thd2()
     return NULL;
 }
 
+void *thd3()
+{
+    for (k = 0; k < T3_DURATION; k++)
+        ;
+    return NULL;
+}
+
 int main(/*int argc, char *const argv[]*/)
 {
-    bthread_t t1, t2;
+    bthread_t t1, t2, t3;
     bthread_create(&t1, thd1, NULL);
     bthread_create(&t2, thd2, NULL);
-    while (i != T1_DURATION && j != T2_DURATION) {
-        printf("i: %d\tj: %d\n", i, j);
-        for (int k = 0; k < 0x2800000; k++)
+    bthread_create(&t3, thd3, NULL);
+    while (i != T1_DURATION || j != T2_DURATION || k != T2_DURATION) {
+        printf("i: %d\tj: %d\tk: %d\n", i, j, k);
+        for (int l = 0; l < 0x5000000; l++)
             ;
     }
+    puts("finishing main");
     return 0;
 }

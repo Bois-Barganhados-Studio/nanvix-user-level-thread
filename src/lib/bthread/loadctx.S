@@ -11,7 +11,7 @@ loadctx:
     movl 12(%eax), %ebx   
     movl 16(%eax), %edx   
     movl 32(%eax), %ecx
-    movl 8(%eax), %esp
+    movl 36(%eax), %esp
     pushl %ecx
     movl 28(%eax), %ecx
     pushl %ecx

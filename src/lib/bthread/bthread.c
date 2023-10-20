@@ -52,9 +52,12 @@ static unsigned tq_end = 0;
 static struct tcb threadtab[BTHREAD_THREADS_MAX];
 static unsigned thd_count = 0;
 static struct tcb *curr_thread = &(threadtab[MAIN_THREAD]);
-static jmp_buf sched_ctx;
+
+static char *sched_stack[BTHREAD_STACK_SIZE];
+static jmp_buf sched_ctx, first_create;
 
 extern void loadctx(unsigned long *ctx);
+extern void start_routine(unsigned (*alarm)(), jmp_buf sched_ctx, unsigned (*turnoff_alarm)(), struct tcb *thread);
 static inline void set_sigalrm_handler();
 
 static unsigned turnoff_alarm(void)
@@ -101,10 +104,12 @@ static void btrestorer(void)
         "pop 24(%%eax)\n\t"
         "pop 28(%%eax)\n\t"
         "pop 32(%%eax)\n\t"
+        "lea 0(%%esp), %%ecx\n\t"
+        "movl %%ecx, 36(%%eax)\n\t"
         "push $1\n\t"
         "push %%edx\n\t"
         "call longjmp\n\t"
-        :
+        : /* No output operands */
         : "a" (curr_thread->ctx),
           "d" (sched_ctx)
     );
@@ -117,7 +122,7 @@ static void handler()
 
 static inline void set_sigalrm_handler()
 {
-    unsigned long ret;
+    sighandler_t ret;
     __asm__ volatile (
 		"int $0x80" 
 		: "=a" (ret)
@@ -126,68 +131,94 @@ static inline void set_sigalrm_handler()
 		  "c" (handler), 
 		  "d" (btrestorer) 
 	);
+    if (ret == SIG_ERR) {
+        printf("signal failed\n");
+    }
 }
 
 static void scheduler(void)
 {
-    switch (setjmp(sched_ctx)) {
-    case 0:
-        return;
-    case 1:
-    {
-        unsigned next = 0;
+    register int val = setjmp(sched_ctx);
+    if (val == 0) {
+        longjmp(first_create, 1);
+    } else if (val == 1) {
+        register unsigned next = 0;
         if (curr_thread->state == RUNNING) {
             curr_thread->state = READY;
             enqueue(curr_thread->tid);
         }
-        dequeue(); // Desculpe :(
-        struct tcb *next_thread = &(threadtab[next]);
-        curr_thread = next_thread;
-        if (next_thread->state == CREATED) {
-            __asm__ volatile (
-                "movl %%ebp, 1016(%%eax)\n\t"
-                "movl %%esp, 1020(%%eax)\n\t"
-                "lea 1020(%%eax), %%esp\n\t"
-                "lea 1020(%%eax), %%ebp\n\t"
-                "subl $4, %%esp\n\t"
-                "call *%%ebx\n\t"
-                "push %%ecx\n\t"
-                "call *%%edx\n\t"
-                "addl $4, %%esp\n\t"
-                "pop %%ebp\n\t"
-                "movl 0(%%esp), %%ecx\n\t"
-                "movl %%ecx, %%esp\n\t"
-                : "=a" (next_thread->ret)
-                : "a" (next_thread->stack),
-                  "c" (next_thread->arg),
-                  "d" (next_thread->routine),
-                  "b" (bthread_alarm)
-            );
-            turnoff_alarm();
-            next_thread->state = FINISHED;
-            free(next_thread->stack);
-            next_thread->stack = NULL;
-            if (next_thread->is_detached) {
-                next_thread->state = AVAILABLE;
-            }
-            longjmp(sched_ctx, 1);
+        dequeue();
+        curr_thread = &(threadtab[next]);
+        if (curr_thread->state == CREATED) {
+            printf("first run tid: %d\n", curr_thread->tid);
+            curr_thread->state = RUNNING;
+            //int al_ret = bthread_alarm();
+            //printf("alarm ret: %d\n", al_ret);
+            start_routine(bthread_alarm, sched_ctx, turnoff_alarm, curr_thread);
+            // __asm__ volatile (
+            //     "movl %%ebp, 1016(%1)\n\t"
+            //     "movl %%esp, 1020(%1)\n\t"
+            //     "lea 1020(%1), %%esp\n\t"
+            //     "lea 1020(%1), %%ebp\n\t"
+            //     "subl $4, %%esp\n\t"
+            //     "push %6\n\t"
+            //     "push %5\n\t"
+            //     "push %3\n\t"
+            //     "push %4\n\t"
+            //     "call *%2\n\t"
+            //     "pop %4\n\t"
+            //     "call *%4\n\t"
+            //     "addl $4, %%esp\n\t"
+            //     "pop %5\n\t"
+            //     "pop %6\n\t"
+            //     "pop %%ebp\n\t"
+            //     "movl 0(%%esp), %%ecx\n\t"
+            //     "movl %%ecx, %%esp\n\t"
+            //     "push $2\n\t"
+            //     "push %6\n\t"
+            //     "call *%5\n\t"
+            //     "call longjmp\n\t"
+            //     : "=r" (curr_thread->ret)
+            //     : "r" (curr_thread->stack),
+            //     "r" (bthread_alarm),
+            //     "r" (curr_thread->arg),
+            //     "r" (curr_thread->routine),
+            //     "r" (turnoff_alarm),
+            //     "r" (sched_ctx)
+            // );
         } else {
+            printf("swaping to tid: %d\n", curr_thread->tid);
+            curr_thread->state = RUNNING;
             bthread_alarm();
-            loadctx(next_thread->ctx);
+            loadctx(curr_thread->ctx);
         }
-        break;
+    } else if (val == 2) {
+        printf("finishing tid: %d\n", curr_thread->tid);
+        curr_thread->state = FINISHED;
+        free(curr_thread->stack);
+        curr_thread->stack = NULL;
+        if (curr_thread->is_detached) {
+            curr_thread->state = AVAILABLE;
+        }
+        longjmp(sched_ctx, 1);
     }
-}
 spin:
     goto spin;
 }
 
 extern int bthread_create(bthread_t *thread, void *(*start_routine)(), void *arg)
 {
-    puts("called create thread");
     if (thd_count == 0) {
-        // FIXME - CREATE STACK FOR SCHEDULER
-        scheduler();
+        if (!setjmp(first_create)) {
+            __asm__ volatile (
+                "lea 1016(%%eax), %%esp\n\t"
+                "lea 1020(%%eax), %%ebp\n\t"
+                "jmp *%%edx\n\t"
+                : /* No output operands */
+                : "a" (sched_stack),
+                  "d" (scheduler)
+            );
+        }
         threadtab[MAIN_THREAD].tid = 0;
         threadtab[MAIN_THREAD].state = RUNNING;
         for (int i = 1; i < BTHREAD_THREADS_MAX; i++) {
@@ -213,7 +244,6 @@ extern int bthread_create(bthread_t *thread, void *(*start_routine)(), void *arg
     this_thd->arg = arg;
     this_thd->ret = NULL;
     enqueue(this_thd->tid);
-    printf("created thread %d\n", this_thd->tid);
     if (thd_count++ == 0) {
         set_sigalrm_handler();
         bthread_alarm();
