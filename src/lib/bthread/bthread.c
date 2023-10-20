@@ -152,40 +152,7 @@ static void scheduler(void)
         if (curr_thread->state == CREATED) {
             printf("first run tid: %d\n", curr_thread->tid);
             curr_thread->state = RUNNING;
-            //int al_ret = bthread_alarm();
-            //printf("alarm ret: %d\n", al_ret);
             start_routine(bthread_alarm, sched_ctx, turnoff_alarm, curr_thread);
-            // __asm__ volatile (
-            //     "movl %%ebp, 1016(%1)\n\t"
-            //     "movl %%esp, 1020(%1)\n\t"
-            //     "lea 1020(%1), %%esp\n\t"
-            //     "lea 1020(%1), %%ebp\n\t"
-            //     "subl $4, %%esp\n\t"
-            //     "push %6\n\t"
-            //     "push %5\n\t"
-            //     "push %3\n\t"
-            //     "push %4\n\t"
-            //     "call *%2\n\t"
-            //     "pop %4\n\t"
-            //     "call *%4\n\t"
-            //     "addl $4, %%esp\n\t"
-            //     "pop %5\n\t"
-            //     "pop %6\n\t"
-            //     "pop %%ebp\n\t"
-            //     "movl 0(%%esp), %%ecx\n\t"
-            //     "movl %%ecx, %%esp\n\t"
-            //     "push $2\n\t"
-            //     "push %6\n\t"
-            //     "call *%5\n\t"
-            //     "call longjmp\n\t"
-            //     : "=r" (curr_thread->ret)
-            //     : "r" (curr_thread->stack),
-            //     "r" (bthread_alarm),
-            //     "r" (curr_thread->arg),
-            //     "r" (curr_thread->routine),
-            //     "r" (turnoff_alarm),
-            //     "r" (sched_ctx)
-            // );
         } else {
             printf("swaping to tid: %d\n", curr_thread->tid);
             curr_thread->state = RUNNING;
