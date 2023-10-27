@@ -43,7 +43,7 @@ struct tcb
     void *stack;
     void *(*routine)();
     void *arg;
-    void **ret;
+    void *ret;
 };
 
 static bthread_t tqueue[BTHREAD_THREADS_MAX];
@@ -56,7 +56,9 @@ static struct tcb *curr_thread = &(threadtab[MAIN_THREAD]);
 static char *sched_stack[BTHREAD_STACK_SIZE];
 static jmp_buf sched_ctx, first_create;
 
-extern void loadctx(unsigned long *ctx);
+//extern void bt_do_restore(context_t thread_ctx, jmp_buf sched_ctx);
+extern void savectx(context_t ctx, jmp_buf sched_ctx);
+extern void loadctx(context_t ctx);
 extern void start_routine(unsigned (*alarm)(), jmp_buf sched_ctx, unsigned (*turnoff_alarm)(), struct tcb *thread);
 static inline void set_sigalrm_handler();
 
@@ -92,6 +94,7 @@ static unsigned bthread_alarm()
 
 static void btrestorer(void)
 {
+    //bt_do_restore(curr_thread->ctx, sched_ctx);
     __asm__ volatile (
         "pop %%ebp\n\t"
         "add $4, %%esp\n\t"
@@ -117,6 +120,7 @@ static void btrestorer(void)
 
 static void handler()
 {
+    puts("handler called");
     set_sigalrm_handler();
 }
 
@@ -132,7 +136,7 @@ static inline void set_sigalrm_handler()
 		  "d" (btrestorer) 
 	);
     if (ret == SIG_ERR) {
-        printf("signal failed\n");
+        fprintf(stderr, "signal failed\n");
     }
 }
 
@@ -218,3 +222,47 @@ extern int bthread_create(bthread_t *thread, void *(*start_routine)(), void *arg
     return 0;
 }
 
+extern void bthread_yield(void)
+{
+    savectx(curr_thread->ctx, sched_ctx);
+    turnoff_alarm();
+    longjmp(sched_ctx, 1);
+}
+
+extern int bthread_detach(bthread_t thread)
+{
+    if (thread < 1 || thread > BTHREAD_THREADS_MAX) {
+        return ESRCH;
+    } else if (!threadtab[thread].is_detached) {
+        threadtab[thread].is_detached = true;
+        if (threadtab[thread].state == FINISHED) {
+            curr_thread->state = AVAILABLE;
+        }
+    }
+    return 0;
+}
+
+extern int bthread_join(bthread_t thread, void **thread_return)
+{
+    if (thread < 1 || thread > BTHREAD_THREADS_MAX 
+    || threadtab[thread].state == AVAILABLE) {
+        return ESRCH;
+    }
+    
+    while (1) {
+        if (threadtab[thread].state != FINISHED) {
+            savectx(curr_thread->ctx, sched_ctx);
+        } else break;
+    }
+    if (thread_return) {
+        
+    }
+    // *thread_return = threadtab[thread].ret;
+    // threadtab[thread].state = AVAILABLE;
+    return 0;
+}
+
+extern bthread_t bthread_self(void)
+{
+    return curr_thread->tid;
+}
