@@ -22,7 +22,18 @@
     } \
     tq_end-- 
 
-typedef unsigned long context_t[BTHREAD_CTXBUF_SIZE];
+typedef struct {
+    unsigned long edi;
+    unsigned long esi;
+    unsigned long ebp;
+    unsigned long ebx;
+    unsigned long edx;
+    unsigned long ecx;
+    unsigned long eax;
+    unsigned long eflags;
+    unsigned long eip;
+    unsigned long esp;
+} context_t[1];
 
 enum tstate
 {
@@ -48,6 +59,8 @@ struct tcb
 
 static bthread_t tqueue[BTHREAD_THREADS_MAX];
 static unsigned tq_end = 0;
+
+static unsigned swap_count[BTHREAD_THREADS_MAX] = { 0 };
 
 static struct tcb threadtab[BTHREAD_THREADS_MAX];
 static unsigned thd_count = 0;
@@ -151,10 +164,33 @@ static void dequeue2(void)
     curr_thread = &(threadtab[next]);
 }
 
+static void print_ctx(void)
+{
+    printf("edi: %x, esi: %x, ebp: %x, ebx: %x, edx: %x, ecx: %x, eax: %x, eflags: %x, eip: %x, esp: %x}\n", 
+        curr_thread->ctx->edi, curr_thread->ctx->esi, curr_thread->ctx->ebp, curr_thread->ctx->ebx, curr_thread->ctx->edx, 
+        curr_thread->ctx->ecx, curr_thread->ctx->eax, curr_thread->ctx->eflags, curr_thread->ctx->eip, curr_thread->ctx->esp
+    );
+}
+
+static void print_save(void)
+{
+    printf("t%d: saving ctx\n", curr_thread->tid);
+}
+
+static void print_load(void)
+{
+    printf("t%d: loading ctx\tswap_count: %d\n", curr_thread->tid, ++swap_count[curr_thread->tid]);
+}
+
+static void print_firstrun()
+{
+    printf("t%d: first run\n", curr_thread->tid);
+}
 
 static void scheduler2(void)
 {
     if (curr_thread->state == RUNNING) {
+        print_save();
         savectx2(curr_thread->ctx);
         curr_thread->state = READY;
         enqueue2(curr_thread->tid);
@@ -162,10 +198,13 @@ static void scheduler2(void)
     dequeue2();
     if (curr_thread->state == CREATED) {
         curr_thread->state = RUNNING;
+        print_firstrun();
         build_stack(curr_thread->stack, routine_caller);
     } else {
         curr_thread->state = RUNNING;
         bthread_alarm();
+        print_load();
+        print_ctx();
         loadctx(curr_thread->ctx);
     }
 }

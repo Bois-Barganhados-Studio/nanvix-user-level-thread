@@ -62,7 +62,9 @@ savectx2:
     movl %esp, BTHREAD_CTXBUF_ESP(%eax)
     
     /* return to caller */
-    jmp *%edx
+    subl $36, %esp
+    push %edx
+    ret
 
 build_stack:
     movl 8(%esp), %eax      /* routine caller */

@@ -13,12 +13,15 @@ static unsigned long MAIN = 0;
 static unsigned long i = 0;
 static unsigned long j = 0;
 static unsigned long k = 0;
+static unsigned thd_finish = 0;
 
 
 void *thd1()
 {
     for (i = 0; i < T1_DURATION; i++)
         ;
+    puts("t1 operation done");
+    thd_finish = 1;
     return NULL;
 }
 
@@ -26,24 +29,27 @@ void *thd2()
 {
     for (j = 0; j < T2_DURATION; j++)
         ;
+    puts("t2 operation done");
+    thd_finish = 2;
     return NULL;
 }
 
-void *thd3()
-{
-    for (k = 0; k < T3_DURATION; k++)
-        ;
-    return NULL;
-}
+// void *thd3()
+// {
+//     for (k = 0; k < T3_DURATION; k++)
+//         ;
+//     puts("t3 operation done");
+//     return NULL;
+// }
 
 
 int main(/*int argc, char *const argv[]*/)
 {
-    bthread_t t1, t2, t3;
+    bthread_t t1, t2/*, t3*/;
 
     bthread_create(&t1, thd1, NULL);
     bthread_create(&t2, thd2, NULL);
-    bthread_create(&t3, thd3, NULL);
+    //bthread_create(&t3, thd3, NULL);
     
     //void *t1_ret = NULL;
 
