@@ -18,6 +18,16 @@
 #define BTHREAD_CTXBUF_EIP      32
 #define BTHREAD_CTXBUF_ESP      36
 
+/* bthread tcb offsets */
+#define BTHREAD_TCB_TID         0
+#define BTHREAD_TCB_CTX         4
+#define BTHREAD_TCB_DETACH      44
+#define BTHREAD_TCB_STATE       48
+#define BTHREAD_TCB_STACK       52
+#define BTHREAD_TCB_ROUTINE     56
+#define BTHREAD_TCB_ARG         60
+#define BTHREAD_TCB_RET         64
+
 #ifndef _ASM_FILE_
 
 typedef unsigned bthread_t;

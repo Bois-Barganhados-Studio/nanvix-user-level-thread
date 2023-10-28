@@ -33,6 +33,48 @@
 .type loadctx,@function 
 .type bt_do_restore,@function
 
+/* new approach */
+
+.globl savectx2
+.globl build_stack
+
+.type build_stack,@function
+.type savectx2,@function
+
+
+savectx2:
+    movl 0(%esp), %edx      /* save caller eip */
+    movl 4(%esp), %eax
+    addl $28, %esp          /* undo stack align */
+    popl %ebp
+    addl $8, %esp           /* clear restorer info */
+
+    /* saving thread context */
+    popl BTHREAD_CTXBUF_EDI(%eax)
+    popl BTHREAD_CTXBUF_ESI(%eax)
+    popl BTHREAD_CTXBUF_EBP(%eax)
+    popl BTHREAD_CTXBUF_EBX(%eax)
+    popl BTHREAD_CTXBUF_EDX(%eax)
+    popl BTHREAD_CTXBUF_ECX(%eax)
+    popl BTHREAD_CTXBUF_EAX(%eax)
+    popl BTHREAD_CTXBUF_EFLAGS(%eax)
+    popl BTHREAD_CTXBUF_EIP(%eax)
+    movl %esp, BTHREAD_CTXBUF_ESP(%eax)
+    
+    /* return to caller */
+    jmp *%edx
+
+build_stack:
+    movl 8(%esp), %eax      /* routine caller */
+    movl 4(%esp), %edx      /* thread stack */
+
+    /* building stack for the thread */
+    lea BTHREAD_STACK_SIZE - 4(%edx), %esp
+    lea BTHREAD_STACK_SIZE - 4(%edx), %ebp
+
+    /* calling thread routine */
+    jmp *%eax
+
 bt_do_restore:
     addl $4, %esp           /* clear saved eip */
     popl %eax
@@ -107,7 +149,6 @@ loadctx:
 
 start_routine:
     movl 16(%esp), %eax         /* tcb */
-    movl 8(%esp), %edx          /* sched_ctx */
 
     /* saving sched sp */
     lea 0(%esp), %edx
@@ -122,6 +163,7 @@ start_routine:
     push 12(%edx)
     push 8(%edx)
     
+    /* calling alarm */
     call *4(%edx)
     movl 8(%esp), %eax
 
