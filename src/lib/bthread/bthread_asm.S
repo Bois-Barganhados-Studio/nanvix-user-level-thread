@@ -22,32 +22,33 @@
 
 #include <bthread.h>
 
-
-.globl savectx
 .globl loadctx
-.globl start_routine
-.globl bt_do_restore
+.globl savectx
+.globl set_stack
 
-.type start_routine,@function
-.type savectx,@function
 .type loadctx,@function 
-.type bt_do_restore,@function
-
-/* new approach */
-
-.globl savectx2
-.globl build_stack
-
-.type build_stack,@function
-.type savectx2,@function
+.type set_stack,@function
+.type savectx,@function
 
 
-savectx2:
-    movl 0(%esp), %edx      /* save caller eip */
-    movl 4(%esp), %eax
-    addl $28, %esp          /* undo stack align */
-    popl %ebp
-    addl $8, %esp           /* clear restorer info */
+/*----------------------------------------------------------------------------*
+ *                                  savectx()                                 *
+ *----------------------------------------------------------------------------*/
+
+ /*
+ * Saves thread context, either from yield() or from stack after alarm().
+ */
+savectx:
+    movl 0(%esp), %ecx      /* save return eip */
+    movl 4(%esp), %eax      /* context buffer */
+    movl 8(%esp), %edx      /* mode */
+    test %edx, %edx
+    jnz savectx.from_yield
+
+savectx.from_stack:
+    /* reset ebp and esp */
+    movl 28(%esp), %ebp
+    addl $36, %esp
 
     /* saving thread context */
     popl BTHREAD_CTXBUF_EDI(%eax)
@@ -62,124 +63,69 @@ savectx2:
     movl %esp, BTHREAD_CTXBUF_ESP(%eax)
     
     /* return to caller */
-    subl $36, %esp
-    push %edx
+    push %ecx
     ret
 
-build_stack:
-    movl 8(%esp), %eax      /* routine caller */
-    movl 4(%esp), %edx      /* thread stack */
-
-    /* building stack for the thread */
-    lea BTHREAD_STACK_SIZE - 4(%edx), %esp
-    lea BTHREAD_STACK_SIZE - 4(%edx), %ebp
-
-    /* calling thread routine */
-    jmp *%eax
-
-bt_do_restore:
-    addl $4, %esp           /* clear saved eip */
-    popl %eax
-    popl %edx
-    addl $4, %esp           /* ? */
-    popl %ebp               /* undo caller new frame */
-    addl $4, %esp           /* clear caller ret eip */
-    
-    /* save thread context */
-    popl 0(%eax)
-    popl 4(%eax)
-    popl 8(%eax)
-    popl 12(%eax)
-    popl 16(%eax)
-    popl 20(%eax)
-    popl 24(%eax)
-    popl 28(%eax)
-    popl 32(%eax)
-    leal 0(%esp), %ecx
-    movl %ecx, 36(%eax)
-    
-    /* back to scheduler */
-    pushl $1
-    pushl %edx
-    call longjmp
-    /* no return */
-
-savectx:
-    pushl %eax 
-    pushl %edx 
-    movl 12(%esp), %eax
-    movl 16(%esp), %edx
+savectx.from_yield:
+    /* saving callee saved registers */
     movl %edi, BTHREAD_CTXBUF_EDI(%eax)
     movl %esi, BTHREAD_CTXBUF_ESI(%eax)
+    movl 28(%esp), %ebp
     movl %ebp, BTHREAD_CTXBUF_EBP(%eax)
     movl %ebx, BTHREAD_CTXBUF_EBX(%eax)
-    popl BTHREAD_CTXBUF_EDX(%eax)
-    movl %ecx, BTHREAD_CTXBUF_ECX(%eax)
-    popl BTHREAD_CTXBUF_EAX(%eax)
     pushf
     popl BTHREAD_CTXBUF_EFLAGS(%eax)
-    movl 0(%esp), %ecx
+    movl 32(%esp), %ecx
     movl %ecx, BTHREAD_CTXBUF_EIP(%eax)
-    movl %esp, BTHREAD_CTXBUF_ESP(%eax)
-    push $1
-    push %edx
-    push $0
-    call alarm
-    add $4, %esp
-    call longjmp
-    /* no return */
+    lea 36(%esp), %edx
+    movl %edx, BTHREAD_CTXBUF_ESP(%eax)
 
+    /* return to yield */
+    ret
+
+/*----------------------------------------------------------------------------*
+ *                                 loadctx()                                  *
+ *----------------------------------------------------------------------------*/
+
+ /*
+ * Loads thread context from buffer.
+ */
 loadctx:
     movl 4(%esp), %eax
     addl $8, %esp
-    movl 0(%eax), %edi  
-    movl 4(%eax), %esi   
-    movl 8(%eax), %ebp   
-    movl 12(%eax), %ebx   
-    movl 16(%eax), %edx   
-    movl 32(%eax), %ecx
-    movl 36(%eax), %esp
+    movl BTHREAD_CTXBUF_EDI(%eax), %edi  
+    movl BTHREAD_CTXBUF_ESI(%eax), %esi   
+    movl BTHREAD_CTXBUF_EBP(%eax), %ebp   
+    movl BTHREAD_CTXBUF_EBX(%eax), %ebx   
+    movl BTHREAD_CTXBUF_EDX(%eax), %edx   
+    movl BTHREAD_CTXBUF_EIP(%eax), %ecx
+    movl BTHREAD_CTXBUF_ESP(%eax), %esp
     pushl %ecx
-    movl 28(%eax), %ecx
+    movl BTHREAD_CTXBUF_EFLAGS(%eax), %ecx
     pushl %ecx
-    movl 24(%eax), %ecx
+    movl BTHREAD_CTXBUF_EAX(%eax), %ecx
     pushl %ecx
-    movl 20(%eax), %ecx
+    movl BTHREAD_CTXBUF_ECX(%eax), %ecx
     popl %eax
     popf
     ret
 
-start_routine:
-    movl 16(%esp), %eax         /* tcb */
+/*----------------------------------------------------------------------------*
+ *                                 set_stack()                                *
+ *----------------------------------------------------------------------------*/
 
-    /* saving sched sp */
-    lea 0(%esp), %edx
+ /*
+ * Sets a new stack to a non returning routine, then calls it.
+ */
+set_stack:
+    movl 4(%esp), %eax      /* new stack */
+    movl 8(%esp), %edx      /* non returning routine */
 
-    /* building stack for the thread */
-    movl 52(%eax), %ecx
-    lea 1020(%ecx), %esp
-    lea 1020(%ecx), %ebp
+    /* set stack for the routine */
+    lea BTHREAD_STACK_SIZE - 4(%eax), %esp
+    lea BTHREAD_STACK_SIZE - 4(%eax), %ebp
 
-    /* saving vars to call thread routine */
-    push %eax
-    push 12(%edx)
-    push 8(%edx)
-    
-    /* calling alarm */
-    call *4(%edx)
-    movl 8(%esp), %eax
+    /* calling the non returning routine */
+    jmp *%edx
 
-    /* calling thread routine */
-    push 60(%eax)
-    call *56(%eax)     
 
-    /* saving routine return, then calling `turnoff_alarm` */
-    movl %eax, 0(%esp)
-    movl 8(%esp), %ecx
-    call *%ecx
-
-    /* restoring vars before routine call, then back to scheduler */
-    movl 12(%esp), %eax
-    pop 64(%eax)
-    movl $2, 4(%esp) 
-    call longjmp

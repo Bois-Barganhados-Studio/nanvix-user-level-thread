@@ -4,7 +4,7 @@
 #define BTHREAD_THREADS_MAX 16      /* Maximum number of threads per process. */
 #define BTHREAD_STACK_SIZE 1024     /* Thread stack size in bytes. */
 #define BTHREAD_CTXBUF_SIZE 10      /* Number of registers saved in the context buffer. */
-#define BTHREAD_TQUANTUM 10
+#define BTHREAD_TQUANTUM 10         /* Quantum of each thread (in system ticks) */
 
 /* bthread context offsets */
 #define BTHREAD_CTXBUF_EDI      0
@@ -30,25 +30,51 @@
 
 #ifndef _ASM_FILE_
 
+#define DEBUG_PRINT 0
+
 typedef unsigned bthread_t;
 
+/*
+ * @brief Creates a new thread in the calling process.
+ * @param thread A pointer to a `bthread_t` variable.
+ * @param start_routine The function to be executed by the created thread.
+ * @param arg The only argument passed to `start_routine()`.
+ * @return If sucessful `bthread_create()` shall return zero, otherwise `EAGAIN` shall be returned if there are no thread resources avaiable i.e. the calling process has already `BTHREAD_THREADS_MAX` simoutaneus thread instances. 
+ */
 extern int bthread_create(bthread_t *thread, void *(*start_routine)(), void *arg);
-extern void bthread_exit(void *retval);
+
+/*
+ * @brief Suspends the calling thread execution while until the target `thread` terminates,
+ * unless the target `thread` has already terminated.
+ * @param thread The target thread to be joined.
+ * @param thread_return The return value from the joined thread.
+ * @return If sucessful `bthread_join()` shall return zero, otherwise `EINVAL` if the target `thread` is not joinable or `ESRCH` if the target `thread` could not be found.
+ */
 extern int bthread_join(bthread_t thread, void **thread_return);
-extern int bthread_cancel(bthread_t thread);
+
+/*
+ * @brief Releases the target `thread` resources when called or after its termination.
+ * @param thread The target thread to be detached.
+ * @return If sucessful `bthread_join()` shall return zero,  otherwise `ESRCH` if the target `thread` could not be found.
+ */
 extern int bthread_detach(bthread_t thread);
+
+/*
+ * @brief Yeilds execution by the calling thread.
+ */
 extern void bthread_yield(void);
+
+/*
+ * @brief Returns a `bthread_t` reffering to the calling thread.
+ */
 extern bthread_t bthread_self(void);
+
+/* Not implemented yet */
+extern void bthread_exit(void *retval);
+extern int bthread_cancel(bthread_t thread);
+
 // Maybe do mutex stuff too.
 
-
-
-#ifdef IMPL_TESTS
-    void set_static_var(unsigned long val);
-    unsigned long get_static_var();
-    extern void round_robin_test();
-    extern void stk_test();
-#endif /* IMPL_TESTS */
 
 #endif /* _ASM_FILE_ */
 #endif /* BTHREAD_H_ */
