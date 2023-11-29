@@ -1,10 +1,10 @@
 #ifndef BTHREAD_H_
 #define BTHREAD_H_
 
-#define BTHREAD_THREADS_MAX 16      /* Maximum number of threads per process. */
-#define BTHREAD_STACK_SIZE 1024     /* Thread stack size in bytes. */
-#define BTHREAD_CTXBUF_SIZE 10      /* Number of registers saved in the context buffer. */
-#define BTHREAD_TQUANTUM 10         /* Quantum of each thread (in system ticks) */
+#define BTHREAD_THREADS_MAX     16      /* Maximum number of threads per process. */
+#define BTHREAD_STACK_SIZE      1024    /* Thread stack size in bytes. */
+#define BTHREAD_CTXBUF_SIZE     10      /* Number of registers saved in the context buffer. */
+#define BTHREAD_TQUANTUM        10      /* Quantum of each thread (in system ticks) */
 
 /* bthread context offsets */
 #define BTHREAD_CTXBUF_EDI      0
@@ -69,8 +69,11 @@ extern void bthread_yield(void);
  */
 extern bthread_t bthread_self(void);
 
-/* Not implemented yet */
-extern void bthread_exit(void *retval);
+/*
+ * @brief Terminates the calling thread.
+ * @return If sucessful `bthread_cancel()` shall return zero, 
+ * otherwise `ESRCH` if the target `thread` could not be found.
+ */
 extern int bthread_cancel(bthread_t thread);
 
 // Maybe do mutex stuff too.

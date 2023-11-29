@@ -25,9 +25,9 @@ longjmp:
     movl 4(%esp), %ecx
     movl 8(%esp), %eax 
     test %eax, %eax
-    jnz valnz
+    jnz longjmp.valnz
     inc %eax
-valnz:
+longjmp.valnz:
     movl 0(%ecx), %ebx
     movl 4(%ecx), %esi
     movl 8(%ecx), %edi

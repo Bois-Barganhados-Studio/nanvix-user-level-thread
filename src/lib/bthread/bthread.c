@@ -207,6 +207,22 @@ static int dequeue(void)
     return 0;
 }
 
+/*
+ * @brief Removes a thread from the queue.
+ */
+static void remove_from_queue(bthread_t tid)
+{
+    for (unsigned i = 0; i < tq_end; i++) {
+        if (tqueue[i] == tid) {
+            for (unsigned j = i; j < tq_end - 1; j++) {
+                tqueue[j] = tqueue[j + 1];
+            }
+            tq_end--;
+            break;
+        }
+    }
+}
+
 /*----------------------------------------------------------------------------*
  *                          THREAD SYSTEM FUNCTIONS                           *
  *----------------------------------------------------------------------------*/
@@ -270,11 +286,14 @@ static void scheduler(void)
     } else if (curr_thread->state == CREATED) {
         curr_thread->state = RUNNING;
         set_stack(curr_thread->stack, routine_caller);
-    } else {
+    } else if (curr_thread->state == READY) {
         curr_thread->state = RUNNING;
         bthread_alarm();
         loadctx(curr_thread->ctx);
         /* no return */
+    } else {
+        fprintf(stderr, "bthread(): currupted TCB\n");
+        exit(1);
     }
 }
 
@@ -282,8 +301,9 @@ static void scheduler(void)
  *                          USER AVAIABLE FUNCTIONS                           *
  *----------------------------------------------------------------------------*/
 
-extern int bthread_create(bthread_t *thread, void *(*start_routine)(), void *arg)
+int bthread_create(bthread_t *thread, void *(*start_routine)(), void *arg)
 {
+    // Initialize threadtab
     if (thd_count == 0) {
         threadtab[MAIN_THREAD].tid = 0;
         threadtab[MAIN_THREAD].state = RUNNING;
@@ -291,7 +311,7 @@ extern int bthread_create(bthread_t *thread, void *(*start_routine)(), void *arg
             threadtab[i].state = AVAILABLE;
         }
     }
-
+    // Find available TCB
     struct tcb *this_thd = NULL;
     for (unsigned i = 1; i < BTHREAD_THREADS_MAX; i++) {
         if (threadtab[i].state == AVAILABLE) {
@@ -300,11 +320,12 @@ extern int bthread_create(bthread_t *thread, void *(*start_routine)(), void *arg
             break;
         }
     }
-
+    // No available TCB
     if (this_thd == NULL) {
         return EAGAIN;
     }
 
+    // Setup TCB
     *thread = this_thd->tid;
     this_thd->is_detached = false;
     this_thd->state = CREATED;
@@ -314,6 +335,7 @@ extern int bthread_create(bthread_t *thread, void *(*start_routine)(), void *arg
     this_thd->ret = NULL;
     enqueue(this_thd->tid);
 
+    // If first created thread, set round robin scheduler
     if (thd_count++ == 0) {
         set_sigalrm_handler();
         bthread_alarm();
@@ -321,14 +343,14 @@ extern int bthread_create(bthread_t *thread, void *(*start_routine)(), void *arg
     return 0;
 }
 
-extern void bthread_yield(void)
+void bthread_yield(void)
 {
     savectx(curr_thread->ctx, 1);
     turnoff_alarm();
     set_stack(sched_stack, scheduler);
 }
 
-extern int bthread_detach(bthread_t thread)
+int bthread_detach(bthread_t thread)
 {
     if (thread < 1 || thread > BTHREAD_THREADS_MAX) {
         return ESRCH;
@@ -341,7 +363,7 @@ extern int bthread_detach(bthread_t thread)
     return 0;
 }
 
-extern int bthread_join(bthread_t thread, void **thread_return)
+int bthread_join(bthread_t thread, void **thread_return)
 {
     if (thread < 1 || thread > BTHREAD_THREADS_MAX 
     || threadtab[thread].state == AVAILABLE) {
@@ -364,7 +386,23 @@ extern int bthread_join(bthread_t thread, void **thread_return)
     return 0;
 }
 
-extern bthread_t bthread_self(void)
+bthread_t bthread_self(void)
 {
     return curr_thread->tid;
+}
+
+int bthread_cancel(bthread_t thread)
+{
+    // Invalid thread
+    if (thread < 1 || thread > BTHREAD_THREADS_MAX 
+    || threadtab[thread].state == AVAILABLE) {
+        return ESRCH;
+    }
+
+    threadtab[thread].state = FINISHED;
+    threadtab[thread].is_detached = true;
+    remove_from_queue(thread);
+    bthread_yield();
+
+    return 0;
 }
