@@ -27,6 +27,7 @@ typedef struct {
 enum tstate
 {
     AVAILABLE,
+    BLOCKED,
     CREATED,
     FINISHED,
     READY,
@@ -34,6 +35,7 @@ enum tstate
     WAITING
 };
 
+// Changing this struct will break asm code
 struct tcb
 {
     bthread_t tid;
@@ -46,11 +48,12 @@ struct tcb
     void *ret;
 };
 
-static struct tcb threadtab[BTHREAD_THREADS_MAX];
+static struct tcb threadtab[BTHREAD_THREADS_MAX] = { {0} };
 static unsigned thd_count = 0;
 static struct tcb *curr_thread = &(threadtab[MAIN_THREAD]);
-
 static char *sched_stack[BTHREAD_STACK_SIZE];
+
+static bthread_t jointab[BTHREAD_THREADS_MAX] = { -1 };
 
 /* extern asm functions */
 
@@ -90,7 +93,7 @@ static void scheduler(void);
 /* debug functions */
 
 
-#if DEBUG_PRINT
+#if 0
 static void print_curr_thread()
 {
     static char *state[] = {
@@ -197,14 +200,11 @@ static int dequeue(void)
 {
     unsigned next = tqueue[0];
     curr_thread = &(threadtab[next]);
-    if (tq_end == 1) {
-        return TQ_EMPTY;
-    }
-    for (unsigned i = 0; i < tq_end - 1; i++) {
+    for (unsigned i = 0; i < tq_end; i++) {
         tqueue[i] = tqueue[i + 1];
     }
     tq_end--;
-    return 0;
+    return (tq_end == 0) ? TQ_EMPTY : 0;
 }
 
 /*
@@ -253,6 +253,15 @@ static void handler()
 }
 
 /*
+ * @details Used by `savectx()` to avoid saving wrong `%esp` value
+ * caused by `btrestorer()` call that stacks variables.
+ */
+extern void call_sched(void)
+{
+    set_stack(sched_stack, scheduler);
+}
+
+/*
  * @brief Called when `handler()` returns, 
  * saves the context of the current thread, 
  * then calls `scheduler()`.
@@ -260,7 +269,6 @@ static void handler()
 static void btrestorer(void)
 {
     savectx(curr_thread->ctx, 0);
-    set_stack(sched_stack, scheduler);
     /* no return */
 }
 
@@ -269,6 +277,7 @@ static void btrestorer(void)
  */
 static void scheduler(void)
 {
+    // Set current thread state
     if (curr_thread->state == RUNNING) {
         curr_thread->state = READY;
         enqueue(curr_thread->tid);
@@ -277,10 +286,14 @@ static void scheduler(void)
         curr_thread->stack = NULL;
         if (curr_thread->is_detached) {
             curr_thread->state = AVAILABLE;
+        } else if (jointab[curr_thread->tid] != -1) {
+            threadtab[jointab[curr_thread->tid]].state = READY;
+            enqueue(jointab[curr_thread->tid]);
         }
     }
-
-    if (dequeue() == TQ_EMPTY) {
+    // Calls next thread
+    int ret = dequeue();
+    if (ret == TQ_EMPTY && curr_thread->state == READY) {
         loadctx(curr_thread->ctx);
         /* no return */
     } else if (curr_thread->state == CREATED) {
@@ -292,9 +305,18 @@ static void scheduler(void)
         loadctx(curr_thread->ctx);
         /* no return */
     } else {
-        fprintf(stderr, "bthread(): currupted TCB\n");
+        fprintf(stderr, "bthread(): currupted thread queue\n");
         exit(1);
     }
+}
+
+static void free_thread(bthread_t tid)
+{
+    if (threadtab[tid].stack != NULL) {
+        free(threadtab[tid].stack);
+        threadtab[tid].stack = NULL;
+    }
+    threadtab[tid].state = AVAILABLE;
 }
 
 /*----------------------------------------------------------------------------*
@@ -307,6 +329,7 @@ int bthread_create(bthread_t *thread, void *(*start_routine)(), void *arg)
     if (thd_count == 0) {
         threadtab[MAIN_THREAD].tid = 0;
         threadtab[MAIN_THREAD].state = RUNNING;
+        jointab[MAIN_THREAD] = -1;
         for (int i = 1; i < BTHREAD_THREADS_MAX; i++) {
             threadtab[i].state = AVAILABLE;
         }
@@ -327,6 +350,7 @@ int bthread_create(bthread_t *thread, void *(*start_routine)(), void *arg)
 
     // Setup TCB
     *thread = this_thd->tid;
+    jointab[this_thd->tid] = -1;
     this_thd->is_detached = false;
     this_thd->state = CREATED;
     this_thd->stack = malloc(BTHREAD_STACK_SIZE);
@@ -357,7 +381,7 @@ int bthread_detach(bthread_t thread)
     } else if (!threadtab[thread].is_detached) {
         threadtab[thread].is_detached = true;
         if (threadtab[thread].state == FINISHED) {
-            curr_thread->state = AVAILABLE;
+            free_thread(thread);
         }
     }
     return 0;
@@ -368,21 +392,24 @@ int bthread_join(bthread_t thread, void **thread_return)
     if (thread < 1 || thread > BTHREAD_THREADS_MAX 
     || threadtab[thread].state == AVAILABLE) {
         return ESRCH;
-    } else if (threadtab[thread].is_detached) {
+    } else if (threadtab[thread].is_detached || jointab[thread] != -1) {
         return EINVAL;
     }
 
-    while (1) {
-        if (threadtab[thread].state != FINISHED)
-            bthread_yield();
-        else break;
-    }
-    
+    if (threadtab[thread].state != FINISHED) {
+        // Wait for thread to finish
+        turnoff_alarm();
+        curr_thread->state = WAITING;
+        jointab[thread] = curr_thread->tid;
+        bthread_yield();
+    } 
+
     if (thread_return != NULL) {
         *thread_return = threadtab[thread].ret;
     }
 
-    threadtab[thread].state = AVAILABLE;
+    free_thread(thread);
+
     return 0;
 }
 
@@ -398,11 +425,23 @@ int bthread_cancel(bthread_t thread)
     || threadtab[thread].state == AVAILABLE) {
         return ESRCH;
     }
+    
+    if (curr_thread->tid == thread) {
+        threadtab[thread].state = FINISHED;
+        threadtab[thread].is_detached = true;
+        bthread_yield();
+    } else {
+        remove_from_queue(thread);
+        
+        // Remove from jointab
+        for (unsigned i = 0; i < BTHREAD_THREADS_MAX; i++) {
+            if (jointab[i] == thread) {
+                jointab[i] = -1;
+            }
+        }
 
-    threadtab[thread].state = FINISHED;
-    threadtab[thread].is_detached = true;
-    remove_from_queue(thread);
-    bthread_yield();
+        free_thread(thread);
+    }
 
     return 0;
 }

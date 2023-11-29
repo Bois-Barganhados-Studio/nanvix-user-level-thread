@@ -32,7 +32,8 @@
 
 #define DEBUG_PRINT 0
 
-typedef unsigned bthread_t;
+typedef int bthread_t;
+typedef struct btmutext_t_ btmutex_t;
 
 /*
  * @brief Creates a new thread in the calling process.
@@ -45,7 +46,7 @@ extern int bthread_create(bthread_t *thread, void *(*start_routine)(), void *arg
 
 /*
  * @brief Suspends the calling thread execution while until the target `thread` terminates,
- * unless the target `thread` has already terminated.
+ * unless the target `thread` has already terminated. A thread can be joined only once.
  * @param thread The target thread to be joined.
  * @param thread_return The return value from the joined thread.
  * @return If sucessful `bthread_join()` shall return zero, otherwise `EINVAL` if the target `thread` is not joinable or `ESRCH` if the target `thread` could not be found.
@@ -53,7 +54,7 @@ extern int bthread_create(bthread_t *thread, void *(*start_routine)(), void *arg
 extern int bthread_join(bthread_t thread, void **thread_return);
 
 /*
- * @brief Releases the target `thread` resources when called or after its termination.
+ * @brief Releases the target `thread` resources after its termination or if target `thread` is finished instantly releases it.
  * @param thread The target thread to be detached.
  * @return If sucessful `bthread_join()` shall return zero,  otherwise `ESRCH` if the target `thread` could not be found.
  */
@@ -70,14 +71,35 @@ extern void bthread_yield(void);
 extern bthread_t bthread_self(void);
 
 /*
- * @brief Terminates the calling thread.
+ * @brief Terminates the calling thread and releases its resources.
  * @return If sucessful `bthread_cancel()` shall return zero, 
  * otherwise `ESRCH` if the target `thread` could not be found.
  */
 extern int bthread_cancel(bthread_t thread);
 
-// Maybe do mutex stuff too.
+/*
+ * @brief Initializes a mutex object.
+ * @param mutex A pointer to a `btmutex_t` variable.
+ */
+extern void bthread_mutex_init(btmutex_t *mutex);
 
+/*
+ * @brief Locks a mutex object.
+ * @param mutex A pointer to a `btmutex_t` variable.
+ */
+extern void bthread_mutex_lock(btmutex_t *mutex);
+
+/*
+ * @brief Unlocks a mutex object.
+ * @param mutex A pointer to a `btmutex_t` variable.
+ */
+extern void bthread_mutex_unlock(btmutex_t *mutex);
+
+/*
+ * @brief Destroys a mutex object.
+ * @param mutex A pointer to a `btmutex_t` variable.
+ */
+extern void bthread_mutex_destroy(btmutex_t *mutex);
 
 #endif /* _ASM_FILE_ */
 #endif /* BTHREAD_H_ */

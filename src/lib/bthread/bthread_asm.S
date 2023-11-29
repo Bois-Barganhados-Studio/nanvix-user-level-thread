@@ -62,9 +62,8 @@ savectx.from_stack:
     popl BTHREAD_CTXBUF_EIP(%eax)
     movl %esp, BTHREAD_CTXBUF_ESP(%eax)
     
-    /* return to caller */
-    push %ecx
-    ret
+    /* return to scheduler */
+    jmp call_sched
 
 savectx.from_yield:
     /* saving callee saved registers */

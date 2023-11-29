@@ -5,8 +5,8 @@
 #include <unistd.h>
 #include <stdlib.h>
 
-#define T1_DURATION 0x40000000
-#define T2_DURATION 0x40000000
+#define T1_DURATION 0x12000000
+#define T2_DURATION 0x20000000
 
 static unsigned long i = 0;
 static unsigned long j = 0;
@@ -21,7 +21,7 @@ void *thd1()
 void *thd2()
 {
     int *val = malloc(sizeof(int));
-    *val = 69;
+    *val = 7;
     for (j = 0; j < T2_DURATION; j++)
         ;
     return val;
@@ -37,11 +37,12 @@ int main(/*int argc, char *const argv[]*/)
     int *t2_ret = NULL;
 
     bthread_detach(t1);
-    while (i < T1_DURATION)
-    {
-        printf("i: %d\tj: %d\n", i, j);
-        bthread_yield();
-    }
+    // while (i < T1_DURATION)
+    // {
+    //     printf("i: %d\tj: %d\n", i, j);
+    //     bthread_yield();
+    // }
+    bthread_cancel(t1);
     bthread_join(t2, (void *)&t2_ret);
     printf("t2 ret: %d\n", *t2_ret);
 

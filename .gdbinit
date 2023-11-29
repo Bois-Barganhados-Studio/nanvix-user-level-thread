@@ -13,7 +13,7 @@ focus cmd
 set detach-on-fork
 #set breakpoint pending on
 b scheduler
-b bthread.c:343
+b bthread_join
 
 define hook-stop
 	if $_isvoid ($_exitcode) != 1
