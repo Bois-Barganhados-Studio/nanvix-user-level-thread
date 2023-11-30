@@ -33,7 +33,7 @@
 #define DEBUG_PRINT 0
 
 typedef int bthread_t;
-typedef struct btmutext_t_ btmutex_t;
+struct bt_mutex;
 
 /*
  * @brief Creates a new thread in the calling process.
@@ -79,27 +79,33 @@ extern int bthread_cancel(bthread_t thread);
 
 /*
  * @brief Initializes a mutex object.
- * @param mutex A pointer to a `btmutex_t` variable.
+ * @return A pointer to a `bt_mutext` variable, or `NULL` if `malloc()` fails.
  */
-extern void bthread_mutex_init(btmutex_t *mutex);
+extern struct bt_mutex *bthread_mutex_init(void);
 
 /*
  * @brief Locks a mutex object.
- * @param mutex A pointer to a `btmutex_t` variable.
+ * @param mutex A pointer to a `bt_mutext` variable.
+ * @return If sucessful `bthread_mutex_lock()` shall return zero,
+ * otherwise `EINVAL` if the mutex is already locked or is `NULL`.
  */
-extern void bthread_mutex_lock(btmutex_t *mutex);
+extern int bthread_mutex_lock(struct bt_mutex *mutex);
 
 /*
  * @brief Unlocks a mutex object.
- * @param mutex A pointer to a `btmutex_t` variable.
+ * @param mutex A pointer to a `bt_mutext` variable.
+ * @return If sucessful `bthread_mutex_unlock()` shall return zero,
+ * otherwise `EINVAL` if the mutex is not locked by the calling thread or is `NULL`.
  */
-extern void bthread_mutex_unlock(btmutex_t *mutex);
+extern int bthread_mutex_unlock(struct bt_mutex *mutex);
 
 /*
  * @brief Destroys a mutex object.
- * @param mutex A pointer to a `btmutex_t` variable.
+ * @param mutex A pointer to a `bt_mutext` variable.
+ * @return If sucessful `bthread_mutex_destroy()` shall return zero,
+ * otherwise `EBUSY` if the mutex is locked or `EINVAL` if mutext is `NULL`.
  */
-extern void bthread_mutex_destroy(btmutex_t *mutex);
+extern int bthread_mutex_destroy(struct bt_mutex *mutex);
 
 #endif /* _ASM_FILE_ */
 #endif /* BTHREAD_H_ */

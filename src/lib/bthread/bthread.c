@@ -4,6 +4,10 @@
 #include <errno.h>
 #include <stdio.h>
 
+/*----------------------------------------------------------------------------*
+ *                            STATIC DECLARATIONS                             *
+ *----------------------------------------------------------------------------*/
+
 /* Quick bool implementation */
 #define bool char
 #define true 1
@@ -26,7 +30,7 @@ typedef struct {
 
 enum tstate
 {
-    AVAILABLE,
+    AVAILABLE = 0,
     BLOCKED,
     CREATED,
     FINISHED,
@@ -35,7 +39,7 @@ enum tstate
     WAITING
 };
 
-// Changing this struct will break asm code
+// Changing this struct may break asm code
 struct tcb
 {
     bthread_t tid;
@@ -48,7 +52,13 @@ struct tcb
     void *ret;
 };
 
-static struct tcb threadtab[BTHREAD_THREADS_MAX] = { {0} };
+struct bt_mutex
+{
+    bthread_t locker;
+    bool wait_map[BTHREAD_THREADS_MAX];
+};
+
+static struct tcb threadtab[BTHREAD_THREADS_MAX] = { { 0 } };
 static unsigned thd_count = 0;
 static struct tcb *curr_thread = &(threadtab[MAIN_THREAD]);
 static char *sched_stack[BTHREAD_STACK_SIZE];
@@ -91,13 +101,12 @@ static void btrestorer(void);
 static void scheduler(void);
 
 /* debug functions */
-
-
 #if 0
 static void print_curr_thread()
 {
     static char *state[] = {
         "AVAILABLE",
+        "BLOCKED",
         "CREATED",
         "FINISHED",
         "READY",
@@ -134,7 +143,7 @@ static inline void set_sigalrm_handler()
 		  "d" (btrestorer) 
 	);
     if (ret == SIG_ERR) {
-        fprintf(stderr, "signal failed\n");
+        fprintf(stderr, "bthread(): signal failed\n");
     }
 }
 
@@ -320,7 +329,7 @@ static void free_thread(bthread_t tid)
 }
 
 /*----------------------------------------------------------------------------*
- *                          USER AVAIABLE FUNCTIONS                           *
+ *                          USER AVAILABLE FUNCTIONS                           *
  *----------------------------------------------------------------------------*/
 
 int bthread_create(bthread_t *thread, void *(*start_routine)(), void *arg)
@@ -432,7 +441,7 @@ int bthread_cancel(bthread_t thread)
         bthread_yield();
     } else {
         remove_from_queue(thread);
-        
+
         // Remove from jointab
         for (unsigned i = 0; i < BTHREAD_THREADS_MAX; i++) {
             if (jointab[i] == thread) {
@@ -443,5 +452,63 @@ int bthread_cancel(bthread_t thread)
         free_thread(thread);
     }
 
+    return 0;
+}
+
+struct bt_mutex *bthread_mutex_init(void)
+{
+    struct bt_mutex *mutex = malloc(sizeof(struct bt_mutex));
+    if (mutex != NULL) {
+        mutex->locker = -1;
+        for (unsigned i = 0; i < BTHREAD_THREADS_MAX; i++) {
+            mutex->wait_map[i] = false;
+        }
+    }
+    return mutex;
+}
+
+int bthread_mutex_lock(struct bt_mutex *mutex)
+{
+    if (mutex == NULL || mutex->locker == curr_thread->tid) {
+        return EINVAL; 
+    } else if (mutex->locker == -1) {
+        turnoff_alarm();
+        mutex->locker = curr_thread->tid;
+        bthread_alarm();
+    } else {
+        turnoff_alarm();
+        mutex->wait_map[curr_thread->tid] = true;
+        curr_thread->state = BLOCKED;
+        bthread_yield();
+    }
+    return 0;
+}
+
+int bthread_mutex_unlock(struct bt_mutex *mutex)
+{
+    if (mutex == NULL || mutex->locker != curr_thread->tid) {
+        return EINVAL;
+    }
+    mutex->locker = -1;
+    for (unsigned i = 0; i < BTHREAD_THREADS_MAX; i++) {
+        if (mutex->wait_map[i]) {
+            mutex->locker = i;
+            threadtab[i].state = READY;
+            enqueue(i);
+            mutex->wait_map[i] = false;
+            break;
+        }
+    }
+    return 0;
+}
+
+int bthread_mutex_destroy(struct bt_mutex *mutex)
+{
+    if (mutex == NULL) {
+        return EINVAL;
+    } else if (mutex->locker != -1) {
+        return EBUSY;
+    }
+    free(mutex);
     return 0;
 }
