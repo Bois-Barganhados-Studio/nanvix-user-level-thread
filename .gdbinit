@@ -3,13 +3,16 @@
 
 layout split
 target remote tcp::1234
-file bin/kernel
-symbol-file bin/kernel
+set debug-file-directory bin/
+#file bin/kernel
+add-symbol-file bin/kernel
+add-symbol-file bin/ubin/bthd
 handle SIGSEGV nostop noprint nopass
 set confirm off
 focus cmd
 set detach-on-fork
-b kmain
+#set breakpoint pending on
+b scheduler
 
 define hook-stop
 	if $_isvoid ($_exitcode) != 1

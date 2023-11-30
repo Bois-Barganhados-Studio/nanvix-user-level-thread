@@ -1,5 +1,5 @@
 /*
- * Copyright(C) 2023 Vinicius G. Santos <viniciusgsantos@protonmail.com>
+ * Copyright(C) 2011-2016 Pedro H. Penna <pedrohenriquepenna@gmail.com>
  *
  * This file is part of Nanvix.
  *
@@ -17,33 +17,30 @@
  * along with Nanvix. If not, see <http://www.gnu.org/licenses/>.
  */
 
-/**
- * @file
- *
- * @brief Non-local jumps.
+#include <nanvix/const.h>
+#include <nanvix/clock.h>
+#include <nanvix/pm.h>
+
+/*
+ * Schedules an alarm signal.
  */
+PUBLIC unsigned sys_btalarm(unsigned c_seconds)
+{
+	unsigned oldalarm;
 
-#ifndef SETJMP_H_
-#define SETJMP_H_
+	oldalarm = curr_proc->alarm;
 
-/**
- * @brief A buffer where the context at the `setjmp()` call is saved at.
- * Each position contains the data stored in the
- * registers in the following order:
- * ebx, esi, edi, eflags, ebp, esp, eip
-*/
-typedef unsigned long jmp_buf[7];
+	/* Schedule alarm. */
+	if (c_seconds > 0)
+		curr_proc->alarm = ticks + c_seconds*CLOCK_FREQ / 100;
 
-/**
- * @brief Saves current context in `buf`. 
- * Returns zero.
-*/
-int setjmp (jmp_buf buf);
+	/* Cancel alarm. */
+	else
+		curr_proc->alarm = 0;
 
-/**
- * @brief Jumps to the context saved in `buf`.
- * Changes the `setjmp()` return to `val` or 1 if `val` is 0.
-*/
-void longjmp (jmp_buf buf, int val);
+	/* Alarm would ring soon if we had not re-scheduled it. */
+	if (oldalarm <= ticks)
+		return (0);
 
-#endif // SETJMP_H_
+	return ((oldalarm - ticks)/CLOCK_FREQ);
+}

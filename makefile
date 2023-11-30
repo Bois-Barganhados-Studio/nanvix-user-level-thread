@@ -62,7 +62,7 @@ export LDFLAGS   = -Wl,-T $(LIBDIR)/link.ld
 .PHONY: tools
 
 # Builds everything.
-all: nanvix documentation
+all: clean nanvix image
 
 # Builds Nanvix.
 nanvix:
