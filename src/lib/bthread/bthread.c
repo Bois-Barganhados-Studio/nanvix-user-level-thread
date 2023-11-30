@@ -208,6 +208,9 @@ static void enqueue(bthread_t tid)
 static int dequeue(void)
 {
     unsigned next = tqueue[0];
+    if (tq_end == 0) {
+        return TQ_EMPTY;
+    }
     curr_thread = &(threadtab[next]);
     for (unsigned i = 0; i < tq_end; i++) {
         tqueue[i] = tqueue[i + 1];
