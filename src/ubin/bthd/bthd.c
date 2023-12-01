@@ -91,7 +91,7 @@ int arr[N] = { 0 };
 void *thread(int *arg)
 {
     // WARNING - A larger number can cause a stack overflow
-    #define THREAD_DURATION 256
+    #define THREAD_DURATION 5
 
     for (int i = 0; i < THREAD_DURATION; i++)
     {
